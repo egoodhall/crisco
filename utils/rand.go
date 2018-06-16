@@ -1,21 +1,26 @@
 package utils
 
 import (
-  "math/rand"
-  "time"
+	"math/rand"
+	"time"
 )
 
 var r *rand.Rand // Rand for this package.
+var initialized = false
 
-func init() {
-  r = rand.New(rand.NewSource(time.Now().UnixNano()))
-}
+const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-func RandomString(strlen int) string {
-  const chars = "pvwxyz012345abcqrstudef6789ghijklmno"
-  result := make([]byte, strlen)
-  for i := range result {
-    result[i] = chars[r.Intn(len(chars))]
-  }
-  return string(result)
+// RandomString generates a string, n characters long,
+// comprised of symbols from the ranges: 0-9, A-Z, a-z
+func RandomString(n int) string {
+
+	if !initialized {
+		r = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+
+	result := make([]byte, n)
+	for i := range result {
+		result[i] = chars[r.Intn(len(chars))]
+	}
+	return string(result)
 }

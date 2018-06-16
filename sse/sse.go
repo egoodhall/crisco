@@ -4,8 +4,8 @@ import (
 	"github.com/dustin/go-broadcast"
 )
 
-// Keep track of active channels
-var routeChannels = make(map[string]broadcast.Broadcaster)
+// RouteChannels keeps track of active broadcast channels
+var RouteChannels = make(map[string]broadcast.Broadcaster)
 
 // Keep track of when to remove broadcasters
 var activeListeners = make(map[string]int)
@@ -36,14 +36,14 @@ func CloseListener(route string, listener chan interface{}) {
 }
 
 func deleteBroadcast(route string) {
-	// Close broadcast
-	b, ok := routeChannels[route]
+	// Close channel
+	b, ok := RouteChannels[route]
 	if ok {
 		b.Close()
-		delete(routeChannels, route)
+		delete(RouteChannels, route)
 	}
 
-	// Remove counter for broadcast
+	// Remove counter for channel
 	_, ok = activeListeners[route]
 	if ok {
 		delete(activeListeners, route)
@@ -54,10 +54,10 @@ func deleteBroadcast(route string) {
 // If a channel does not already exist for
 // the route, one is created.
 func URL(route string) broadcast.Broadcaster {
-	b, ok := routeChannels[route]
+	b, ok := RouteChannels[route]
 	if !ok {
 		b = broadcast.NewBroadcaster(10)
-		routeChannels[route] = b
+		RouteChannels[route] = b
 		activeListeners[route] = 0
 	}
 	return b

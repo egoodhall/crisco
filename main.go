@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 
@@ -17,16 +16,22 @@ import (
 // Temporary storage, until MongoDB implemented
 var urlMap = make(map[string]string)
 
+// Structure of incoming data for URL shortening
 type urlToShorten struct {
 	URL string `json:"url"`
 }
 
+// Structure of events that are broadcast to
+// listeners via SSE's
 type clickEvent struct {
 	URL   string `json:"url"`
 	Agent string `json:"agent"`
 	Time  int64  `json:"time"`
 }
 
+// Shorten the url supplied in the request
+// body's JSON. Will respond with a shortened
+// URL that can be used in place of the original
 func shorten(c *gin.Context) {
 	// Generate a map value
 	route := utils.RandomString(6)
@@ -43,39 +48,39 @@ func shorten(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"url": newURL})
 }
 
+// Follow a shortened URL to the destination
+// held within the mapped values
 func follow(c *gin.Context) {
 	route := c.Param("route")
 
+	// Handle forwarding and errors with redirecting
 	dest, ok := urlMap[route]
 	if ok {
 		// Forward to page
-		c.Redirect(http.StatusTemporaryRedirect, urlMap[route])
+		c.Redirect(http.StatusTemporaryRedirect, dest)
 
-		msg, err := json.Marshal(clickEvent{
-			route,
-			c.Request.Header.Get("User-Agent"),
-			utils.GetTime(),
-		})
-		if err != nil {
-			sse.URL(route).Submit("{ \"error\": \"Unable to generate message for click\"}")
-			return
+		// Generate click event only if there's an existing channel to put it on
+		channel, ok := sse.RouteChannels[route]
+		if ok {
+			agent := c.Request.Header.Get("User-Agent")
+			channel.Submit(gin.H{"route": route, "agent": agent, "time": utils.GetTime()})
 		}
-
-		sse.URL(route).Submit(string(msg))
+	} else {
+		c.String(http.StatusNotFound, "Unknown route /%s", route)
 	}
 }
 
+// Subscribe to a broadcaster that dispatches Server-Sent
+// Events on clicks of the shortened link.
 func subscribe(c *gin.Context) {
 	route := c.Param("route")
 
+	// Verify route exists
 	_, ok := urlMap[route]
-
 	if !ok {
-		c.String(http.StatusNotFound, "Stream not available")
+		c.JSON(http.StatusNotFound, gin.H{"error": "Stream not available"})
 		return
 	}
-
-	fmt.Printf("Listener subscribing to: %s\n", route)
 
 	// Open a listener for the route
 	listener := sse.OpenListener(route)
@@ -94,7 +99,7 @@ func main() {
 	// Used for grabbing the URL origin
 	r.Use(location.Default())
 
-	// Set up CORS
+	// Set up CORS (for testing with a React App)
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{"http://localhost:3000"}
 	r.Use(cors.New(config))
